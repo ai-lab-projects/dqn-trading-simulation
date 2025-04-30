@@ -233,19 +233,32 @@ def evaluate(look_back, close_prices, open_prices, buyer, seller, scaler):
     total_trade = 0
     total_hold_days = 0
     records = []
+    action_records = []
     t = look_back
     t_end = len(close_prices) - 2
     while t <= t_end:
         state = np.array(scaler.fit_transform(close_prices[t-look_back+1:t+1].reshape(-1, 1)))  
         state = np.reshape(state, [1, look_back])
-        buyer_action = buyer.get_action(state)  
+        buyer_action = buyer.get_action(state)
+        
+        if buyer_action == 1:
+            action_records.append((t, "buy"))
+        else:
+            action_records.append((t, "hold"))
+            
         if buyer_action == 1:  
             buy_price = open_prices[t+1]
             t_buy = t
             t += 1
             while t <= t_end:
                 input_data = calculate_input_data(close_prices, buy_price, t, t_buy)
-                seller_action = seller.get_action(input_data)  
+                seller_action = seller.get_action(input_data)
+
+                if seller_action == 1:
+                    action_records.append((t, "sell"))
+                else:
+                    action_records.append((t, "hold"))
+                    
                 if seller_action == 1:  
                     total_trade += 1
                     total_hold_days += (t - t_buy)
@@ -268,7 +281,7 @@ def evaluate(look_back, close_prices, open_prices, buyer, seller, scaler):
     p_value, total_reward_over_mean = calculate_p_value(open_prices, look_back, hold_rate=hold_rate, threshold=total_reward)
     print("p value: ", p_value)
 
-    return total_reward, win_rate, average_return, total_trade, hold_rate, average_hold_days, p_value, total_reward_over_mean, records
+    return total_reward, win_rate, average_return, total_trade, hold_rate, average_hold_days, p_value, total_reward_over_mean, records, action_records
 #               0           1             2             3           4             5            6            7                     8
 
 def save_dqn_instance(instance, role, execution_id, trial, episode):
