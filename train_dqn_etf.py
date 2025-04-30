@@ -1,7 +1,3 @@
-save = True
-execution_id = 1
-file = f"results_20250428_{execution_id}.pkl"
-
 import datetime
 import os
 import pandas as pd
@@ -338,7 +334,7 @@ def train_and_evaluate(look_back, params, memory_size, episodes, scaler, gamma, 
                 reward = 0  
                 t += 1
             else:
-                buy_price = open_prices[t+1]  
+                buy_price = train_open_prices[t+1]  
                 t_buy=t
                 t += 1
                 input_data = None
@@ -355,7 +351,7 @@ def train_and_evaluate(look_back, params, memory_size, episodes, scaler, gamma, 
                         else:
                             done = True
                     else:
-                        sell_price = open_prices[t + 1]  
+                        sell_price = train_open_prices[t + 1]  
                         reward = 100*(sell_price - buy_price) / buy_price  
                         t += 1
                         done = True
@@ -441,66 +437,81 @@ def create_params():
     
     return params
 
-ticker = "1655.T"
-start_date = "2017-09-29"
-end_date = "2023-03-31"
+def load_etf_data():
+    ticker = "1655.T"
+    start_date = "2017-09-29"
+    end_date = "2023-03-31"
 
-etf_1655 = yf.download(ticker, start=start_date, end=end_date)
+    etf_1655 = yf.download(ticker, start=start_date, end=end_date)
 
-etf_1655_cleaned = etf_1655[etf_1655['Close'] > 50]
+    etf_1655_cleaned = etf_1655[etf_1655['Close'] > 50]
 
-close_prices = etf_1655_cleaned['Close'].values.flatten()
-open_prices = etf_1655_cleaned['Open'].values.flatten()
+    close_prices = etf_1655_cleaned['Close'].values.flatten()
+    open_prices = etf_1655_cleaned['Open'].values.flatten()
 
-train_close_prices, val_close_prices, test_close_prices = split_data(close_prices)
-train_open_prices, val_open_prices, test_open_prices = split_data(open_prices)
-
-if os.path.exists(file):
-    with open(file, 'rb') as f:
-        results = pickle.load(f)
-else:
-    results = []
-
-for trial in range(10000000):
+    train_close_prices, val_close_prices, test_close_prices = split_data(close_prices)
+    train_open_prices, val_open_prices, test_open_prices = split_data(open_prices)
     
-    print("trial:", trial)
-    
-    look_back = random.choice([10, 20])
-    params = create_params()
-    memory_size = random.choice([1000])
-    episodes = 30
+    return train_close_prices, val_close_prices, test_close_prices, train_open_prices, val_open_prices, test_open_prices
 
-    scaler_choices = [StandardScaler(), MinMaxScaler(),RobustScaler()]
-    scaler = random.choice(scaler_choices)
+if __name__ == "__main__":
     
-    gamma = random.choice([0.95,0.99,0.995])
-    update_target_interval = random.choice([100,200])
-    
-    params.update({
-    'look_back': look_back,
-    'memory_size': memory_size,
-    'episodes': episodes,
-    'scaler': scaler,
-    'gamma': gamma,
-    'update_target_interval': update_target_interval
-    })
-    
-    print(params)
-    
-    train_results, val_results, files = train_and_evaluate(look_back, params, memory_size, episodes, scaler, gamma, update_target_interval, trial)
+    save = True
+    execution_id = 1
+    file = f"results_20250428_{execution_id}.pkl"
 
-    # Store the results in a dictionary
-    trial_results = {
-        'params': params,
-        'train_results': train_results,
-        'val_results': val_results, 
-        'files': files
-    }
-    
-    # Append to the results list
-    results.append(trial_results)
+    train_close_prices, val_close_prices, test_close_prices, train_open_prices, val_open_prices, test_open_prices = load_etf_data()
 
-    # Save to a pickle file after each trial
-    if save:
-        with open(file, 'wb') as f:
-            pickle.dump(results, f)
+    if os.path.exists(file):
+        with open(file, 'rb') as f:
+            results = pickle.load(f)
+    else:
+        results = []
+    
+    trial = 1
+    
+    while True:
+
+        print("trial:", trial)
+
+        look_back = random.choice([10, 20])
+        params = create_params()
+        memory_size = random.choice([1000])
+        episodes = 30
+
+        scaler_choices = [StandardScaler(), MinMaxScaler(),RobustScaler()]
+        scaler = random.choice(scaler_choices)
+
+        gamma = random.choice([0.95,0.99,0.995])
+        update_target_interval = random.choice([100,200])
+
+        params.update({
+        'look_back': look_back,
+        'memory_size': memory_size,
+        'episodes': episodes,
+        'scaler': scaler,
+        'gamma': gamma,
+        'update_target_interval': update_target_interval
+        })
+
+        print(params)
+
+        train_results, val_results, files = train_and_evaluate(look_back, params, memory_size, episodes, scaler, gamma, update_target_interval, trial)
+
+        # Store the results in a dictionary
+        trial_results = {
+            'params': params,
+            'train_results': train_results,
+            'val_results': val_results, 
+            'files': files
+        }
+
+        # Append to the results list
+        results.append(trial_results)
+
+        # Save to a pickle file after each trial
+        if save:
+            with open(file, 'wb') as f:
+                pickle.dump(results, f)
+        
+        trial += 1
